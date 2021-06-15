@@ -38,6 +38,8 @@ const (
 	ProvisioningArtifactReadyTimeout   = 3 * time.Minute
 	ProvisioningArtifactDeletedTimeout = 3 * time.Minute
 
+	PortfolioConstraintsReadyTimeout = 3 * time.Minute
+
 	StatusNotFound    = "NOT_FOUND"
 	StatusUnavailable = "UNAVAILABLE"
 
@@ -406,4 +408,21 @@ func ProvisioningArtifactDeleted(conn *servicecatalog.ServiceCatalog, id, produc
 	}
 
 	return nil
+}
+
+func PortfolioConstraintsReady(conn *servicecatalog.ServiceCatalog, acceptLanguage, portfolioID, productID string) ([]*servicecatalog.ConstraintDetail, error) {
+	stateConf := &resource.StateChangeConf{
+		Pending: []string{StatusNotFound},
+		Target:  []string{servicecatalog.StatusAvailable},
+		Refresh: PortfolioConstraintsStatus(conn, acceptLanguage, portfolioID, productID),
+		Timeout: PortfolioConstraintsReadyTimeout,
+	}
+
+	outputRaw, err := stateConf.WaitForState()
+
+	if output, ok := outputRaw.([]*servicecatalog.ConstraintDetail); ok {
+		return output, err
+	}
+
+	return nil, err
 }
