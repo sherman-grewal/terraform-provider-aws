@@ -299,3 +299,47 @@ func ProvisioningArtifactStatus(conn *servicecatalog.ServiceCatalog, id, product
 		return output, aws.StringValue(output.Status), err
 	}
 }
+
+func PortfolioConstraintsStatus(conn *servicecatalog.ServiceCatalog, acceptLanguage, portfolioID, productID string) resource.StateRefreshFunc {
+	return func() (interface{}, string, error) {
+		input := &servicecatalog.ListConstraintsForPortfolioInput{
+			PortfolioId: aws.String(portfolioID),
+		}
+
+		if acceptLanguage != "" {
+			input.AcceptLanguage = aws.String(acceptLanguage)
+		}
+
+		if productID != "" {
+			input.ProductId = aws.String(productID)
+		}
+
+		var output []*servicecatalog.ConstraintDetail
+
+		err := conn.ListConstraintsForPortfolioPages(input, func(page *servicecatalog.ListConstraintsForPortfolioOutput, lastPage bool) bool {
+			if page == nil {
+				return !lastPage
+			}
+
+			for _, deet := range page.ConstraintDetails {
+				if deet == nil {
+					continue
+				}
+
+				output = append(output, deet)
+			}
+
+			return !lastPage
+		})
+
+		if tfawserr.ErrCodeEquals(err, servicecatalog.ErrCodeResourceNotFoundException) {
+			return nil, StatusNotFound, err
+		}
+
+		if err != nil {
+			return nil, servicecatalog.StatusFailed, err
+		}
+
+		return output, servicecatalog.StatusAvailable, err
+	}
+}
